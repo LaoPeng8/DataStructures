@@ -5,7 +5,7 @@ package org.pjj.datastructure.tree.rbtree;
  * @author PengJiaJun
  * @Date 2022/07/14 13:10
  */
-public class BRTree {
+public class BRTree<K extends Comparable<K>, V> {
 
     private static final boolean RED = false;
     private static final boolean BLACK = true;
@@ -116,6 +116,182 @@ public class BRTree {
         }
     }
 
+    /**
+     * 红黑树 新增节点
+     * @param key
+     * @param value
+     */
+    public V put(K key, V value) {
+        RBNode<K, V> node = new RBNode<K, V>(key, value);//先new好 需要插入的节点
+        if(root == null) {
+            node.parent = null;
+            node.color = BLACK;//根节点肯定是黑色的
+
+            root = node;
+            return null;
+        }
+        // 1. 找到插入的位置 (找到新增节点的父节点)
+        RBNode temp = root;
+        RBNode parent = null;
+        int flag = 0;
+        while(temp != null) {
+            flag = key.compareTo((K) temp.key);
+            if(flag > 0) {// 当前 key > 当前遍历节点的key, 则说明当前key应是插入当前遍历节点key的右边, 则继续往右遍历 (左小右大)
+                parent = temp;//保存父节点
+                temp = temp.right;
+            }else if(flag < 0) {// 当前 key < 当前遍历节点的key, 则说明当前key应是插入当前遍历节点key的左边, 则继续往左遍历 (左小右大)
+                parent = temp;//保存父节点
+                temp = temp.left;
+            }else {
+                // key 值重复
+                // 覆盖value值, 并返回旧的value值
+                V oldValue = (V) temp.value;
+                temp.value = value;
+                return oldValue;
+            }
+        }
+        //退出while到这里说明已经找到当前key, 应该插入的父节点了, 且知道与父节点的关系 flag, 是为左还是为右
+        // 2. 将新节点添加到父节点的子节点中
+        if(flag > 0) {
+            node.parent = parent;
+            node.color = RED;
+            parent.right = node;
+        }else {
+            node.parent = parent;
+            node.color = RED;
+            parent.left = node;
+        }
+
+        // 3. 旋转和变色 调整红黑树的平衡
+
+        return null;
+    }
+
+    private RBNode parentOf(RBNode node) {
+        return node == null ? null : node.parent;
+    }
+
+    private RBNode leftOf(RBNode node) {
+        return node == null ? null : node.left;
+    }
+
+    private RBNode rightOf(RBNode node) {
+        return node == null ? null : node.right;
+    }
+
+    private boolean colorOf(RBNode node) {
+        return node == null ? BLACK : node.color;
+    }
+
+    private void setColor(RBNode node, boolean color) {
+        if(node != null)
+            node.color = color;
+        return;
+    }
+
+    /**
+     * 插入节点到 二节点 是不需要调整的, 二节点为黑色, 插入节点为红色
+     * 插入节点到 三节点 一共有6种情况, 两种情况是不需要调整的, 即 一个黑节点,左右各一个红节点(即插入的节点为 左节点 与 插入节点为右节点 两种情况)
+     *                另外4种情况需要调整, 即 一个黑节点, 左子节点为红节点, 左子节点的左子节点也是红节点(即插入的节点), 这种情况是需要调整的
+     *                                     一个黑节点, 左子节点为红节点, 左子节点的右子节点也是红节点(即插入的节点), 这种情况是需要调整的
+     *                                     一个黑节点, 右子节点为红节点, 右子节点的右子节点也是红节点(即插入的节点), 这种情况是需要调整的
+     *                                     一个黑节点, 右子节点为红节点, 右子节点的左子节点也是红节点(即插入的节点), 这种情况是需要调整的
+     *                实际相当于只有两种情况, 另外两种不过是方向相反, 继续调整时, 左旋右旋的方法也相反
+     * 插入节点到 四节点 一共有4种情况, 都需要调整, 即 一个黑节点, 左子节点为红节点, 左子节点的左子节点也是红节点(即插入的节点), 右子节点为红节点
+     *                                           一个黑节点, 左子节点为红节点, 左子节点的右子节点也是红节点(即插入的节点), 右子节点为红节点
+     *                                           一个黑节点, 右子节点为红节点, 右子节点的右子节点也是红节点(即插入的节点), 左子节点为红节点
+     *                                           一个黑节点, 右子节点为红节点, 右子节点的左子节点也是红节点(即插入的节点), 左子节点为红节点
+     *                可以发现 四节点 插入的 4 种情况 与 三节点 插入的四种情况基本一样, 只是黑节点多了另外一个子节点(但是不影响, 与3节点调整 基本一致)
+     *
+     * 可以发现一共 8 种情况需要调整, 除去方向相反的, 实际只有4种情况
+     *
+     * @param x 插入的节点
+     */
+    private void fixAfterPut(RBNode<K, Object> x) {
+        //插入的节点 肯定是红色
+        x.color = RED;
+
+        //插入的节点不能是根节点, 插入的节点的父节点颜色必须是红色才需要调整 (根节点就是黑色, 父节点是黑色那么子节点是红色很正常也不用管)
+        if(x != null && x != root && x.parent.color == RED) {
+
+            /**
+             * 判断当前节点的父节点, 在它的父节点中, 它是属于左子节点 还是 右子节点  (它 指当前节点的父节点)
+             * 知道了当前节点的父节点, 是左子节点 还是 右子节点后, 就可以区分出 8 种情况中的 4 种情况 与 另外4种方向相反的情况
+             * if处理的情况:
+             *      一个黑节点, 左子节点为红节点, 左子节点的左子节点也是红节点(即插入的节点), 这种情况是需要调整的
+             *      一个黑节点, 左子节点为红节点, 左子节点的右子节点也是红节点(即插入的节点), 这种情况是需要调整的
+             *      一个黑节点, 左子节点为红节点, 左子节点的左子节点也是红节点(即插入的节点), 右子节点为红节点
+             *      一个黑节点, 左子节点为红节点, 左子节点的右子节点也是红节点(即插入的节点), 右子节点为红节点
+             * else处理的情况:
+             *      一个黑节点, 右子节点为红节点, 右子节点的右子节点也是红节点(即插入的节点), 这种情况是需要调整的
+             *      一个黑节点, 右子节点为红节点, 右子节点的左子节点也是红节点(即插入的节点), 这种情况是需要调整的
+             *      一个黑节点, 右子节点为红节点, 右子节点的右子节点也是红节点(即插入的节点), 左子节点为红节点
+             *      一个黑节点, 右子节点为红节点, 右子节点的左子节点也是红节点(即插入的节点), 左子节点为红节点
+             */
+            if(x.parent.parent != null && x.parent == x.parent.parent.left) {
+                RBNode parentBrother = x.parent.parent.right;//获取叔叔节点
+                /**
+                 * 区分出 4 种情况中, 节点插入的是三节点还是四节点, 即有没有叔叔节点
+                 * if处理的情况:
+                 *      一个黑节点, 左子节点为红节点, 左子节点的左子节点也是红节点(即插入的节点), 右子节点为红节点
+                 *      一个黑节点, 左子节点为红节点, 左子节点的右子节点也是红节点(即插入的节点), 右子节点为红节点
+                 * else处理的情况:
+                 *      一个黑节点, 左子节点为红节点, 左子节点的左子节点也是红节点(即插入的节点), 这种情况是需要调整的
+                 *      一个黑节点, 左子节点为红节点, 左子节点的右子节点也是红节点(即插入的节点), 这种情况是需要调整的
+                 */
+                if(parentBrother != null) {//四节点(有叔叔节点)
+                    //变色 + 递归
+                    //父亲 和 叔叔变为黑色, 爷爷变为红色
+                    x.parent.color = BLACK;
+                    parentBrother.color = BLACK;
+                    x.parent.parent.color = RED;
+
+                    //递归处理
+                    x = x.parent.parent;
+                }else {//三节点(无叔叔节点)
+                    if(x == x.parent.right) {
+//                        x = x.parent;
+                        leftRotate(x.parent);//对 x 的父节点继续 左旋
+                    }
+                    //该if处理后 else的两种情况就变为一种了, 即 根节点 -> 左子节点 -> 右子节点 变为了 根节点 -> 左子节点 -> 左子节点
+
+                    //父亲节点变为黑色, 爷爷节点变为红色
+                    x.parent.color = BLACK;
+                    x.parent.parent.color = RED;
+                    //根据 爷爷节点继续右旋
+                    rightRotate(x.parent.parent);
+                }
+            }else {
+                RBNode parentBrother = x.parent.parent.left;//获取叔叔节点
+                if(parentBrother != null) {//四节点(有叔叔节点)
+                    //变色 + 递归
+                    //父亲 和 叔叔变为黑色, 爷爷变为红色
+                    x.parent.color = BLACK;
+                    parentBrother.color = BLACK;
+                    x.parent.parent.color = RED;
+
+                    //递归处理
+                    x = x.parent.parent;
+                }else {//三节点(无叔叔节点)
+                    if(x == x.parent.left) {
+//                        x = x.parent;
+                        rightRotate(x.parent);//对 x 的父节点继续 右旋
+                    }
+
+                    //父亲节点变为黑色, 爷爷节点变为红色
+                    x.parent.color = BLACK;
+                    x.parent.parent.color = RED;
+                    //根据 爷爷节点继续右旋
+                    leftRotate(x.parent.parent);
+                }
+            }
+        }
+
+        //root 节点肯定为黑色
+        root.color = BLACK;
+    }
+
+
 
     static class RBNode<K extends Comparable<K>, V> {
 
@@ -134,19 +310,31 @@ public class BRTree {
         public RBNode() {
         }
 
-        public RBNode(RBNode parent, RBNode left, RBNode right, boolean color, K key, V value) {
+        public RBNode(K key, V value, RBNode parent, RBNode left, RBNode right, boolean color) {
+            this.key = key;
+            this.value = value;
             this.parent = parent;
             this.left = left;
             this.right = right;
             this.color = color;
+        }
+        public RBNode(K key, V value, RBNode parent, boolean color) {
             this.key = key;
             this.value = value;
+            this.parent = parent;
+            this.left = null;
+            this.right = null;
+            this.color = color;
         }
 
         public RBNode(K key, V value, RBNode parent) {
             this.key = key;
             this.value = value;
             this.parent = parent;
+        }
+        public RBNode(K key, V value) {
+            this.key = key;
+            this.value = value;
         }
 
         public RBNode getParent() {
